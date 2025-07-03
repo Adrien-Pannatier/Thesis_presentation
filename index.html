@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Robot Frame Sequence</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+    }
+    img {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      display: block;
+    }
+    #overlay {
+      position: absolute;
+      top: 20px; left: 20px;
+      color: white;
+      font-family: sans-serif;
+      z-index: 2;
+    }
+    
+    /* Presentation overlay styles */
+    .presentation-overlay {
+      position: fixed;
+      width: 1920px;
+      height: 1082px;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    
+    .left-panel {
+      position: absolute;
+      width: 842px;
+      height: 1080px;
+      top: 0;
+      left: 0;
+    }
+    
+    .red-bar {
+      position: absolute;
+      width: 10px;
+      height: 13px;
+      top: 964px;
+      left: 19px;
+      background-color: #e30613;
+      transform: rotate(90deg);
+    }
+    
+    .bottom-strip {
+      position: absolute;
+      width: 1603px;
+      height: 98px;
+      top: 984px;
+      left: 317px;
+    }
+    
+    .author-name {
+      position: absolute;
+      top: 889px;
+      left: 792px;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    
+    /* Slide overlay styles */
+    .slide-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 15;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
+      display: block;
+    }
+    
+    .slide-overlay.active {
+      opacity: 1;
+    }
+    
+    .slide-overlay svg {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    
+    /* Fullscreen button styles */
+    .fullscreen-button {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-family: sans-serif;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+      pointer-events: none;
+    }
+    
+    .fullscreen-button.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    .fullscreen-button:hover {
+      background: rgba(0, 0, 0, 0.9);
+      transform: scale(1.05);
+      transition: all 0.2s ease;
+    }
+    
+    .fullscreen-trigger-zone {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 200px;
+      height: 100px;
+      z-index: 19;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <img id="frame" src="frames/0001.png" alt="Robot frame" />
+  <div id="overlay">
+    <h1>Robot Animation</h1>
+    <!-- <p>Press SPACE to play/pause • Use ← and → to navigate stop points</p> -->
+    <p id="stopInfo">Stop point: 1 / 5</p>
+  </div>
+  
+  <!-- Slide overlays -->
+  <div id="slide1" class="slide-overlay">
+    <object data="slides/slide1.svg" type="image/svg+xml"></object>
+  </div>
+  <div id="slide2" class="slide-overlay">
+    <object data="slides/slide2.svg" type="image/svg+xml"></object>
+  </div>
+  <div id="slide3" class="slide-overlay">
+    <object data="slides/slide3.svg" type="image/svg+xml"></object>
+  </div>
+  <div id="slide4" class="slide-overlay">
+    <object data="slides/slide4.svg" type="image/svg+xml"></object>
+  </div>
+  <div id="slide5" class="slide-overlay">
+    <object data="slides/slide5.svg" type="image/svg+xml"></object>
+  </div>
+  <div id="slide6" class="slide-overlay">
+    <object data="slides/slide6.svg" type="image/svg+xml"></object>
+  </div>
+  <div id="slide7" class="slide-overlay">
+    <object data="slides/slide7.svg" type="image/svg+xml"></object>
+  </div>
+  <div id="slide8" class="slide-overlay">
+    <object data="slides/slide8.svg" type="image/svg+xml"></object>
+  </div>
+  <div id="slide9" class="slide-overlay">
+    <object data="slides/slide9.svg" type="image/svg+xml"></object>
+  </div>
+  
+  <!-- Fullscreen button and trigger zone -->
+  <div class="fullscreen-trigger-zone" id="fullscreenTrigger"></div>
+  <button class="fullscreen-button" id="fullscreenBtn">⛶ Fullscreen</button>
+
+  <script>
+    const totalFrames = 2000; // Update this to match your actual frame count
+    const framePad = 4; // 0001.png → pad of 4
+    const framePath = (index) => `frames/${String(index).padStart(framePad, '0')}.png`;
+    const fps = 60;
+    const frameInterval = 1000 / fps; // 16.67ms for 60fps
+
+    // Define stop points (frame numbers where animation should pause)
+    const stopPoints = [1, 265, 378, 505, 635, 750, 751, 1117, 1200, 1330, 1536]; // Adjust these to your desired stop frames
+    
+    // Define which slide to show for each stop point (null means no slide)
+    const slideMapping = {
+      0: 'slide1', 
+      1: 'slide1', 
+      2: 'slide2',     
+      3: 'slide3',
+      4: 'slide4',    
+      5: 'slide5',    
+      6: null,
+      7: 'slide6',
+      8: 'slide7',
+      9: 'slide8',    
+      10: 'slide9'     
+    };
+    
+    let currentStopIndex = 0;
+    let targetFrame = stopPoints[currentStopIndex];
+    
+    let currentFrame = 1;
+    let isPlaying = false;
+    let animationId = null;
+    let lastFrameTime = 0;
+    let currentActiveSlide = null; // Track which slide is currently active
+    const img = document.getElementById("frame");
+
+    // Preload frames
+    const images = [];
+    for (let i = 1; i <= totalFrames; i++) {
+      const image = new Image();
+      image.src = framePath(i);
+      images.push(image);
+    }
+
+    function updateFrame() {
+      img.src = images[currentFrame - 1].src;
+      // Update stop point info
+      document.getElementById('stopInfo').textContent = 
+        `Stop point: ${currentStopIndex + 1} / ${stopPoints.length} (Frame: ${currentFrame})`;
+      
+      // Update slide display
+      updateSlideDisplay();
+    }
+    
+    function updateSlideDisplay() {
+      // Only update slides when we're at a stop point
+      if (stopPoints.includes(currentFrame)) {
+        const slideId = slideMapping[currentStopIndex];
+        
+        // If we're switching to a different slide, handle fade transition
+        if (slideId !== currentActiveSlide) {
+          // Fade out current slide first
+          if (currentActiveSlide) {
+            const currentSlideElement = document.getElementById(currentActiveSlide);
+            if (currentSlideElement) {
+              currentSlideElement.classList.remove('active');
+            }
+          }
+          
+          // After fade out completes, fade in new slide
+          setTimeout(() => {
+            if (slideId) {
+              const newSlideElement = document.getElementById(slideId);
+              if (newSlideElement) {
+                newSlideElement.classList.add('active');
+              }
+            }
+            currentActiveSlide = slideId;
+          }, slideId && currentActiveSlide ? 500 : 0); // 500ms delay if transitioning between slides
+        }
+      }
+    }
+
+    function animate(currentTime) {
+      if (currentTime - lastFrameTime >= frameInterval) {
+        if (currentFrame < targetFrame) {
+          currentFrame++;
+        } else if (currentFrame > targetFrame) {
+          currentFrame--;
+        }
+        
+        updateFrame();
+        
+        // Stop animation when reaching target frame
+        if (currentFrame === targetFrame) {
+          isPlaying = false;
+          if (animationId) {
+            cancelAnimationFrame(animationId);
+          }
+        }
+        
+        lastFrameTime = currentTime;
+      }
+      
+      if (isPlaying) {
+        animationId = requestAnimationFrame(animate);
+      }
+    }
+
+    function goToStopPoint(index) {
+      if (index >= 0 && index < stopPoints.length) {
+        currentStopIndex = index;
+        targetFrame = stopPoints[currentStopIndex];
+        
+        // Start animation to reach the target frame
+        if (currentFrame !== targetFrame) {
+          isPlaying = true;
+          lastFrameTime = performance.now();
+          animationId = requestAnimationFrame(animate);
+        } else {
+          updateFrame(); // Just update display if already at target
+        }
+      }
+    }
+
+    function skipToCurrentTarget() {
+      // Immediately jump to the target frame
+      currentFrame = targetFrame;
+      isPlaying = false;
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+      updateFrame();
+    }
+
+    function nextStopPoint() {
+      // If already moving to a target, just skip to it and stop
+      if (isPlaying && currentFrame !== targetFrame) {
+        skipToCurrentTarget();
+      } 
+      // Only go to next stop point if we're not currently moving
+      else if (currentStopIndex < stopPoints.length - 1) {
+        goToStopPoint(currentStopIndex + 1);
+      }
+    }
+
+    function previousStopPoint() {
+      // If already moving to a target, just skip to it and stop
+      if (isPlaying && currentFrame !== targetFrame) {
+        skipToCurrentTarget();
+      }
+      // Only go to previous stop point if we're not currently moving
+      else if (currentStopIndex > 0) {
+        goToStopPoint(currentStopIndex - 1);
+      }
+    }
+
+    function togglePlayPause() {
+      isPlaying = !isPlaying;
+      if (isPlaying) {
+        lastFrameTime = performance.now();
+        animationId = requestAnimationFrame(animate);
+      } else {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+      }
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+        togglePlayPause();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        nextStopPoint();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        previousStopPoint();
+      } else if (e.key === "f" || e.key === "F" || e.key === "F11") {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === "Escape") {
+        if (document.fullscreenElement) {
+          exitFullscreen();
+        }
+      }
+    });
+    
+    // Fullscreen functionality
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const fullscreenTrigger = document.getElementById('fullscreenTrigger');
+    
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.log(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+      } else {
+        exitFullscreen();
+      }
+    }
+    
+    function exitFullscreen() {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      }
+    }
+    
+    // Show/hide fullscreen button based on mouse position
+    fullscreenTrigger.addEventListener('mouseenter', () => {
+      fullscreenBtn.classList.add('visible');
+    });
+    
+    fullscreenTrigger.addEventListener('mouseleave', () => {
+      fullscreenBtn.classList.remove('visible');
+    });
+    
+    fullscreenBtn.addEventListener('mouseenter', () => {
+      fullscreenBtn.classList.add('visible');
+    });
+    
+    fullscreenBtn.addEventListener('mouseleave', () => {
+      // Small delay to prevent flickering when moving between trigger and button
+      setTimeout(() => {
+        if (!fullscreenTrigger.matches(':hover') && !fullscreenBtn.matches(':hover')) {
+          fullscreenBtn.classList.remove('visible');
+        }
+      }, 100);
+    });
+    
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+    
+    // Update button text based on fullscreen state
+    document.addEventListener('fullscreenchange', () => {
+      if (document.fullscreenElement) {
+        fullscreenBtn.innerHTML = '⛶ Exit Fullscreen';
+      } else {
+        fullscreenBtn.innerHTML = '⛶ Fullscreen';
+      }
+    });
+
+    // Initialize to first stop point
+    updateFrame();
+    updateSlideDisplay();
+    
+    // Set initial slide state
+    const initialSlideId = slideMapping[0];
+    if (initialSlideId) {
+      currentActiveSlide = initialSlideId;
+      document.getElementById(initialSlideId).classList.add('active');
+    }
+  </script>
+</body>
+</html>

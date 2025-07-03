@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Robot Presentation</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+    }
+    video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      transition: opacity 0.5s ease;
+    }
+    #overlay {
+      position: absolute;
+      top: 20px; left: 20px;
+      color: white;
+      font-family: sans-serif;
+      z-index: 2;
+    }
+    #slide-container {
+      position: absolute;
+      top: 0; right: 0;
+      width: 40vw;
+      height: 100vh;
+      background: rgba(255, 255, 255, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+      transition: opacity 0.5s ease;
+    }
+    #slide-svg {
+      max-width: 90%;
+      max-height: 90%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <video id="videoA" muted></video>
+  <video id="videoB" muted style="opacity: 0;"></video>
+
+  <div id="overlay">
+    <h1 id="title">Robot Ready</h1>
+    <p id="subtitle">Press → to see parts</p>
+  </div>
+
+  <div id="slide-container">
+    <object id="slide-svg" type="image/svg+xml" data="slides/slide1.svg"></object>
+  </div>
+
+  <script type="module">
+    const videos = [
+      { src: "robot-arrives.mp4", title: "Robot arrives", subtitle: "Press →", slide: "slides/slide1.svg" },
+      { src: "robot-leaves.mp4", title: "Robot leaves", subtitle: "Press →", slide: "slides/slide2.svg" }
+    ];
+
+    const videoA = document.getElementById("videoA");
+    const videoB = document.getElementById("videoB");
+    const title = document.getElementById("title");
+    const subtitle = document.getElementById("subtitle");
+    const slideSvg = document.getElementById("slide-svg");
+
+    let current = 0;
+    let activeVideo = videoA;
+    let inactiveVideo = videoB;
+
+    function updateText() {
+      title.innerText = videos[current].title;
+      subtitle.innerText = videos[current].subtitle;
+      slideSvg.data = videos[current].slide;
+    }
+
+    function switchVideo(dir) {
+      current = (current + dir + videos.length) % videos.length;
+
+      // Prepare next video
+      inactiveVideo.src = videos[current].src;
+      inactiveVideo.currentTime = 0;
+      inactiveVideo.loop = false;
+      inactiveVideo.style.opacity = 0;
+      inactiveVideo.play();
+
+      // Fade in new video, fade out current
+      requestAnimationFrame(() => {
+        inactiveVideo.style.transition = "opacity 0.4s ease";
+        activeVideo.style.transition = "opacity 0.4s ease";
+
+        inactiveVideo.style.opacity = 1;
+        activeVideo.style.opacity = 0;
+
+        // Swap references after transition
+        setTimeout(() => {
+          const temp = activeVideo;
+          activeVideo = inactiveVideo;
+          inactiveVideo = temp;
+          updateText();
+        }, 400); // Match transition duration
+      });
+    }
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowRight") switchVideo(1);
+      if (e.key === "ArrowLeft") switchVideo(-1);
+    });
+
+    // Initial setup
+    activeVideo.src = videos[current].src;
+    activeVideo.loop = false;
+    activeVideo.play();
+    updateText();
+  </script>
+</body>
+</html>
